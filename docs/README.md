@@ -95,6 +95,7 @@ https://github.com/sangyc10/CUDA-code
 
 # cuda线程模型
 ## 线程模型结构
+### 一维
         一、线程模型重要概念
                 1、grid 网络
                 2、block 线程块
@@ -107,5 +108,87 @@ https://github.com/sangyc10/CUDA-code
         四、最大允许线程块大小：1024，最大允许网格大小2^31 - 1(针对一维网络) 
 ![线程模型结构](./线程模型结构.jpg)
 
-## 线程组织管理
-## 网格和线程快限制
+### 推广到多维
+        1、cuda可以组织三维网格和线程块
+        2、blockIdx和threadIdx是类型为uint32的变量，该类型是一个结构体，
+        具有x,y,z三个成员(3个成员都是无符号类型的成员)：
+                blockIdx.x,  blockIdx.y,  blockIdx.z
+                threadIdx.x, threadIdx.y, threadIdx.z
+        3、gridDim和blockDim是类型为dim3的变量，该类型是一个结构体，具有xyz三个成员：
+                gridDim.x,  graiDim.y,  gridDim.z
+                blockDim.x, blockDim.y, blockDim.z
+        4、取值范围：
+                blockIdx.x: [0, gridDim.x - 1]
+                blockIdx.y: [0, gridDim.y - 1]
+                blockIdx.z: [0, gridDim.z - 1]
+
+                threadIdx.x: [0, blockDim.x - 1]
+                threadIdx.x: [0, blockDim.y - 1]
+                threadIdx.x: [0, blockDim.z - 1]
+        注意内建变量只有在核函数有效，且无需定义 
+
+        定义多维网络和线程块(c++构造函数语法)
+                dim3 grid_size(Gx, Gy, Gz)
+                dim3 block_size(Bx, By, Bz)
+        举例：定义一个2x2x1的网络，5x3x1的线程块
+                dim grid_size(2, 2) // 等价于 dim3 grid_size(2, 2, 1)
+                dim block_size(5, 3) // 等价于 dim3 block_size(5, 3, 1)
+
+        多维线程块中线程索引
+                int tid = threadIdx.z * blockDim.x * blockDim.y +         threadIdx.y * blockDim.x + threadIdx.x
+        多维网络中的线程块索引
+        int bid = blockIdx.z * gridDim.x * gridDim.y +
+                  blockIdx.y * gridDim.x + blockIdx.x
+
+        网格大小限制：
+                gridDim.x最大值 2^31 - 1
+                gridDim.y最大值 2^16 - 1
+                gridDim.y最大值 2^16 - 1
+        线程大小限制：
+                blockDim.x最大值 1024
+                blockDim.y最大值 1024
+                blockDim.z最大值 64
+
+# 线程全局索引计算方式
+## 一维网格 一维线程块
+        定义grid和bloack尺寸
+                dim3 grid_size(4)
+                dim3 block_size(8)
+        调用核函数：
+                kernel_func<<<gride_size, block_size>>>(...)
+        具体的线程索引方式如图所示，blockIdx.x从0到3，threadIdx.x从0到7
+        计算方式：int id = blockIdx.x * blockDim.x + threadIdx.x
+
+![一维网格一维线程块](./一维网格一维线程块.jpg)
+
+## 二维网格 二维线程块
+        定义grid和block尺寸
+                dim3 grid_size(2, 2)
+                dim3 block_size(4, 4)
+        调用核函数：
+                kernel_fun<<<grid_size, block_size>>>(...)
+        具体的线程索引方式如图所示，blockIdx.x和blockIdx.y从0到1，threadIdx.x和threadIdx.y从0到3
+        计算方式：
+                int blockId = blockIdx.x + blockIdx.y * gridDim.x;
+                int threadId = threadIdx.y * blockDim + threadIdx.x;
+                int id = blockId * (blockDim.x * blockDim.y) + threadId
+![二维网格二维线程块](./二维网格二维线程块.jpg)
+
+## 三维网格 三维线程块
+        定义grid和block尺寸
+                dim3 grid_size(2, 2, 2)
+                dim3 block_size(4, 4, 2)
+        调用核函数
+                kernel_fun<<<grid_size, block_size>>>(...)
+        具体的线程索引方式如图所示，blockIdx.x，blockIdx.y和blockIdx.z从0到1，threadIdx.x, threadIdx.y从0到3，.threadIdx.z从0到1
+        计算方式：
+                int blockId = blockIdx + blockIdx.y * gridDim.x + gridDim.x * gridDim.y * blockDim.z
+                int threadId = (threadIdx.z * (blockDim.x * blockDim.y)) + (threadIdx.y * blockDim.x) + theadIdx.x
+                int id = blockId * (blockDimx * blockDimy * blockDim.z) + threadId
+![三维网络三维线程块](./三维网络三维线程块.jpg)
+
+## 不同组合方式
+![不同组合方式-一维grid](./不同组合方式-一维grid.jpg)
+![不同组合方式-二维grid](./不同组合方式-二维grid.jpg)
+
+
