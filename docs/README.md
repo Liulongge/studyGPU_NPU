@@ -1,5 +1,6 @@
 # 参考
 https://github.com/sangyc10/CUDA-code
+https://www.bilibili.com/video/BV1sM4y1x7of/
 
         GPU: 数据运算
         CPU: 逻辑运算
@@ -191,4 +192,75 @@ https://github.com/sangyc10/CUDA-code
 ![不同组合方式-一维grid](./不同组合方式-一维grid.jpg)
 ![不同组合方式-二维grid](./不同组合方式-二维grid.jpg)
 
+# nvcc编译流程和gpu计算能力
+## nvcc编译流程
+        https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html
+        1、nvcc分离全部源代码：1、主机代码；2、设备代码
+        2、主机(host)代码是c/c++语法、设备(device)代码是c/c++扩展语言编写
+        3、nvcc先将设备代码编译为PTX(Parallel Thread Execution)伪汇编代码，再将PTX代码编译为二进制的cubin目标代码
+        4、在将源代码编译为PTX代码时，需要用选项-arch=compute_XY指定一个虚拟框架的计算能力，用以确定代码中能够使用的CUDA功能
+        5、在将PTX代码编译为cubin代码时，需要用选项-code=sm_ZW指定一个真实框架的计算能力，用以确定可执行文件能够使用的GPU
+![nvcc编译流程](./nvcc编译流程.jpg)
+## PTX
+        1、PTX(Parallel Thread Execution)是cuda平台为基于gpu的通用计算而定义的虚拟机和指令集
+        2、nvcc编译命令总是使用两个体系结构：一是虚拟的中间体系结构；二是实际的gpu体系结构
+        3、虚拟架构更像是对应用所需的gpu功能的声明
+        4、虚拟架构应该尽可能选择低--适配更多gpu，真实框架应该尽可能选择高--充分发挥gpu性能
+        5、PTX文档：https://docs.nvidia.com/cuda/parallel-thread-execution/index.html
+![ptx](./PTX.jpg)
+## gpu计算能力
+        1、每款gpu都有用于标识“计算能力”(compute capability)的版本号
+        2、形式X，Y。X:标识主版本号，Y:标识次版本号
+        3、并非GPU的计算能力越高，性能就越高
+![gpu架构与计算能力](./gpu架构与计算能力.jpg)
+![gpu计算能力与性能](./gpu计算能力与性能.jpg)
 
+# cuda程序兼容性问题
+## 指定虚拟架构计算能力
+        1、c/c++源码编译为ptx时，可以指定虚拟架构的计算能力，用来确定代码中能够使用的cuda功能
+        2、c/c++源码转化为ptx这一步骤与gpu硬件无关
+        3、编译指令(指定虚拟架构计算能力)：
+                -arch=computer_XY
+                XY：第一个数字X代表计算能力的主版本号，第二个数字Y代表计算能力的次版本号
+        4、ptx的指令只能在更高的计算能力的gpu使用
+        例如： nvcchelloworld.cu -o helloworld -crch=compute_61
+        编译出的可执行文件helloworld可以在计算能力>=6.1的gpu上面执行，在计算能力小于6.1的gpu则不能执行
+        
+## 指定真实架构计算能力
+        1、PTX指令转化为二进制cubin代码与具体的gpu框架有关
+        2、编译指令(指定真实框架计算能力)：
+                -code=sm_XY
+                X: 代表计算能力的主版本号，Y: 代表计算能力的次版本号
+        3、注意：
+                1、二进制cubin代码，大版本之间不兼容
+                2、指定真实架构计算能力的时候必须指定虚拟架构计算能力
+                3、指定的真实架构能力必须大于等于虚拟架构的能力
+        4、真实架构可以实现低小版本到高小版本的兼容
+## 指定多个gpu版本编译
+        1、使得编译出来的可执行文件可以在多个GPU中执行
+        2、同时指定多组计算能力
+                编译选项：-gencode arch=compute_XY -code=sm_XY
+                例如：
+                --gencode arch=compute_35 -code=sm_35   开普勒架构
+                --gencode arch=compute_50 -code=sm_50   麦克斯韦架构
+                --gencode arch=compute_60 -code=sm_60   帕斯卡架构
+                --gencode arch=compute_70 -code=sm_70   伏特架构
+        3、编译出的可执行文件包含4个二进制版本，生成的可执行文件称为胖二进制文件(fatbinary)
+        4、注意：
+                1、执行上述指令必须cuda版本支持7.0计算能力，否则会报错
+                2、过多的计算能力，会增加编译时间和可执行文件大小
+## nvcc即时编译
+        1、在运行可执行文件时，从保留的PTX代码临时编译出cubin文件
+        2、在可执行文件中保留PTX代码，nvcc变异指令执行所保留的PTX代码虚拟架构：
+                指令：-gencodemarch=compute_XY， code=compute_XY
+                注意：1、两个计算能力都是虚拟架构计算能力
+                     2、两个虚拟架构计算能力必须一致
+        3、例如：
+                -gencode arch=compute_35 -code=sm_35
+                -gencode arch=compute_50 -code=sm_50
+                -gencode arch=compute_61 -code=sm_61
+                -gencode arch=compute_61 -code=sm_61
+        4、简化：-arch=sm_XY
+                dengjia 
+![nvcc即时编译](./nvcc即时编译.jpg)
+## nvcc编译默认计算能力
